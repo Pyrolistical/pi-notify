@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+: "${PI_NOTIFY_DIR:?pi-notify must run inside a pi session}"
+tmp=$(mktemp "$PI_NOTIFY_DIR/.XXXXXXXX")
+{
+  if [ "$#" -gt 0 ]; then
+    printf '%s\n\n' "$*"
+  fi
+  cat
+} >"$tmp"
+mv "$tmp" "$PI_NOTIFY_DIR/${tmp##*/.}"
