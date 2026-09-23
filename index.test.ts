@@ -6,13 +6,13 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { Inbox, type SteeringSink } from "./index.ts";
 
-type Sent = Parameters<SteeringSink["sendMessage"]>;
+type Sent = Parameters<SteeringSink["sendUserMessage"]>;
 
 class SinkStub implements SteeringSink {
   private readonly received = Promise.withResolvers<Sent>();
   readonly sent = this.received.promise;
 
-  sendMessage(...sent: Sent): void {
+  sendUserMessage(...sent: Sent): void {
     this.received.resolve(sent);
   }
 }
@@ -35,12 +35,8 @@ describe("pi-notify", () => {
     await run(inbox, "bin/pi-notify sh -c 'echo hi; exit 3'");
 
     expect(await sink.sent).toEqual([
-      {
-        customType: "pi-notify",
-        content: "sh -c echo hi; exit 3\n\nhi\nexit 3\n",
-        display: true,
-      },
-      { deliverAs: "steer", triggerTurn: true },
+      "sh -c echo hi; exit 3\n\nhi\nexit 3\n",
+      { deliverAs: "steer" },
     ]);
     await inbox.close();
   });
@@ -57,8 +53,8 @@ describe("pi-notify", () => {
     expect(stdout).toBe(
       `pi-notify: running cat ${fifo} in the background, its output will be sent to you as a message when it exits\n`,
     );
-    const [message] = await sink.sent;
-    expect(message.content).toBe(`cat ${fifo}\n\nhi\nexit 0\n`);
+    const [content] = await sink.sent;
+    expect(content).toBe(`cat ${fifo}\n\nhi\nexit 0\n`);
     await inbox.close();
   });
 
@@ -68,9 +64,9 @@ describe("pi-notify", () => {
 
     await run(inbox, "bin/pi-notify seq 3000");
 
-    const [message] = await sink.sent;
-    expect(message.content).toStartWith("1002\n1003\n");
-    expect(message.content).toMatch(
+    const [content] = await sink.sent;
+    expect(content).toStartWith("1002\n1003\n");
+    expect(content).toMatch(
       /3000\nexit 0\n\n\[Showing last 2000 of 3003 lines\. Full output: .+\]$/,
     );
     await inbox.close();

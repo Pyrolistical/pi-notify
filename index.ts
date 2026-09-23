@@ -11,10 +11,7 @@ const BIN = join(import.meta.dirname, "bin");
 const PROMPT = join(import.meta.dirname, "prompt.md");
 
 export interface SteeringSink {
-  sendMessage: (
-    message: { customType: string; content: string; display: boolean },
-    options: { deliverAs: "steer"; triggerTurn: boolean },
-  ) => void;
+  sendUserMessage: (content: string, options: { deliverAs: "steer" }) => void;
 }
 
 export class Inbox {
@@ -47,14 +44,9 @@ async function relay(
         continue;
       }
       const path = join(dir, filename);
-      sink.sendMessage(
-        {
-          customType: NAME,
-          content: contentOf(path, await readFile(path, "utf8")),
-          display: true,
-        },
-        { deliverAs: "steer", triggerTurn: true },
-      );
+      sink.sendUserMessage(contentOf(path, await readFile(path, "utf8")), {
+        deliverAs: "steer",
+      });
     }
   } catch (err) {
     if (signal.aborted) {

@@ -1,6 +1,6 @@
 # pi-notify
 
-A [Pi](https://pi.dev) extension that adds a `pi-notify` command to the agent's shell. It runs a command in the background and sends its output to the agent as a steering message when it exits.
+A [Pi](https://pi.dev) extension that adds a `pi-notify` command to the agent's shell. It runs a command in the background and sends its output to the agent as a steering user message when it exits.
 
 ## Install
 
@@ -27,5 +27,6 @@ pi-notify make test
 - on `session_start`, creates an inbox directory and exports it as `PI_NOTIFY_DIR`
 - prepends `bin/` to `PATH` so the `bash` tool finds `pi-notify`
 - `bin/pi-notify` writes the command output to a dotfile in the inbox, then renames it once the command exits
-- the extension watches the inbox and sends each renamed file with `deliverAs: "steer"` and `triggerTurn: true`
+- the extension watches the inbox and sends each renamed file with `sendUserMessage` and `deliverAs: "steer"`
+- a user message instead of a custom message, so an idle agent starts the turn through `before_agent_start` and extension system prompt changes apply to every request of the turn, keeping the llama.cpp prefix cache warm
 - on `session_shutdown`, stops watching and deletes the inbox
