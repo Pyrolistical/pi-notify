@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { execFile } from "node:child_process";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { Inbox, type SteeringSink } from "./index.ts";
 
@@ -16,7 +19,7 @@ class SinkStub implements SteeringSink {
 
 const exec = promisify(execFile);
 
-function pipeInto(inbox: Inbox, script: string) {
+function run(inbox: Inbox, script: string) {
   return exec("sh", ["-c", script], {
     cwd: import.meta.dirname,
     env: { ...process.env, PI_NOTIFY_DIR: inbox.dir },
@@ -25,27 +28,37 @@ function pipeInto(inbox: Inbox, script: string) {
 }
 
 describe("pi-notify", () => {
-  test("steers stdin with the title once stdin closes", async () => {
+  test("steers the command output and exit code once it exits", async () => {
     const sink = new SinkStub();
     const inbox = await Inbox.open(sink);
 
-    await pipeInto(inbox, "printf 'hi\\n' | bin/pi-notify make test");
+    await run(inbox, "bin/pi-notify sh -c 'echo hi; exit 3'");
 
     expect(await sink.sent).toEqual([
-      { customType: "pi-notify", content: "make test\n\nhi\n", display: true },
+      {
+        customType: "pi-notify",
+        content: "sh -c echo hi; exit 3\n\nhi\nexit 3\n",
+        display: true,
+      },
       { deliverAs: "steer", triggerTurn: true },
     ]);
     await inbox.close();
   });
 
-  test("steers stdin alone without a title", async () => {
+  test("returns while the command is still running", async () => {
     const sink = new SinkStub();
     const inbox = await Inbox.open(sink);
+    const fifo = join(await mkdtemp(join(tmpdir(), "pi-notify-test-")), "fifo");
+    await exec("mkfifo", [fifo], { timeout: 5000 });
 
-    await pipeInto(inbox, "printf 'hi\\n' | bin/pi-notify");
+    const { stdout } = await run(inbox, `bin/pi-notify cat ${fifo}`);
+    await writeFile(fifo, "hi\n");
 
+    expect(stdout).toBe(
+      `pi-notify: running cat ${fifo} in the background, its output will be sent to you as a message when it exits\n`,
+    );
     const [message] = await sink.sent;
-    expect(message.content).toBe("hi\n");
+    expect(message.content).toBe(`cat ${fifo}\n\nhi\nexit 0\n`);
     await inbox.close();
   });
 
@@ -53,12 +66,12 @@ describe("pi-notify", () => {
     const sink = new SinkStub();
     const inbox = await Inbox.open(sink);
 
-    await pipeInto(inbox, "seq 3000 | bin/pi-notify");
+    await run(inbox, "bin/pi-notify seq 3000");
 
     const [message] = await sink.sent;
-    expect(message.content).toStartWith("1001\n1002\n");
+    expect(message.content).toStartWith("1002\n1003\n");
     expect(message.content).toMatch(
-      /3000\n\n\[Showing last 2000 of 3000 lines\. Full output: .+\]$/,
+      /3000\nexit 0\n\n\[Showing last 2000 of 3003 lines\. Full output: .+\]$/,
     );
     await inbox.close();
   });

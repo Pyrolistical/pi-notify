@@ -8,8 +8,7 @@ import {
 
 const NAME = "pi-notify";
 const BIN = join(import.meta.dirname, "bin");
-const GUIDELINE = `
-To be notified when a long running command finishes, run it in the background piped into pi-notify, e.g. \`{ make test; echo "exit $?"; } 2>&1 | pi-notify make test &\`. When its stdin closes, pi-notify sends the arguments and everything it read to you as a message. Do not poll or sleep waiting for it; do other work instead.`;
+const PROMPT = join(import.meta.dirname, "prompt.md");
 
 export interface SteeringSink {
   sendMessage: (
@@ -81,7 +80,8 @@ function prependPath(dir: string): void {
   process.env.PATH = [dir, path].filter(Boolean).join(delimiter);
 }
 
-export default function notify(pi: ExtensionAPI): void {
+export default async function notify(pi: ExtensionAPI): Promise<void> {
+  const prompt = await readFile(PROMPT, "utf8");
   let inbox: Inbox | undefined;
   pi.on("session_start", async () => {
     inbox = await Inbox.open(pi);
@@ -94,6 +94,6 @@ export default function notify(pi: ExtensionAPI): void {
     inbox = undefined;
   });
   pi.on("before_agent_start", (event) => ({
-    systemPrompt: event.systemPrompt + GUIDELINE,
+    systemPrompt: `${event.systemPrompt}\n\n${prompt}`,
   }));
 }

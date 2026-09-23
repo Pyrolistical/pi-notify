@@ -1,11 +1,13 @@
 #!/bin/sh
 set -eu
 : "${PI_NOTIFY_DIR:?pi-notify must run inside a pi session}"
+: "${1:?usage: pi-notify command [args...]}"
 tmp=$(mktemp "$PI_NOTIFY_DIR/.XXXXXXXX")
-{
-  if [ "$#" -gt 0 ]; then
-    printf '%s\n\n' "$*"
-  fi
-  cat
-} >"$tmp"
-mv "$tmp" "$PI_NOTIFY_DIR/${tmp##*/.}"
+(
+  printf '%s\n\n' "$*"
+  code=0
+  "$@" || code=$?
+  printf 'exit %s\n' "$code"
+  mv "$tmp" "$PI_NOTIFY_DIR/${tmp##*/.}"
+) </dev/null >"$tmp" 2>&1 &
+echo "pi-notify: running $* in the background, its output will be sent to you as a message when it exits"
